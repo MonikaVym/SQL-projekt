@@ -37,8 +37,6 @@ ORDER BY branch_name, payroll_year;
 /*
  * Mzdy v průběhu let klesaly ve všech odvětvích. category A-S
  */
-
-
 SELECT *
 FROM v_trend_of_wages v
 LEFT JOIN czechia_payroll_industry_branch cpib 
@@ -50,7 +48,8 @@ ORDER BY cpib.code
 
 
 --Otázka 2: Kolik je možné si koupit litrů mléka a kilogramů chleba za první a poslední srovnatelné období v dostupných datech cen a mezd?
-CREATE OR REPLACE VIEW v_price_bread_milk as
+
+CREATE OR REPLACE VIEW v_price_bread_milk AS -- pouze ceny mléka a chleba, bez údajů mezd
 SELECT cpc.name AS product_name,
 		date_part('year',cp.date_from) AS date,
 		round(avg(cp.value::numeric),2) AS avg_value,
@@ -82,7 +81,7 @@ ORDER BY name, date
 
 
 
-CREATE OR REPLACE VIEW v_purchasing_power_bread_milk as
+CREATE OR REPLACE VIEW v_purchasing_power_branches AS  -- kupní síla za dané odvětví (branch)
 SELECT wage.payroll_year AS year,
 	wage.branch_name,
 	wage.total_value,
@@ -96,7 +95,7 @@ FROM
 			total_value,
 			trend_of_wages
 	FROM v_trend_of_wages) wage
-LEFT JOIN 
+LEFT JOIN  
 	(SELECT product_name,
 			date,
 			avg_value
@@ -106,7 +105,22 @@ LEFT JOIN
  ON wage.payroll_year = price."date"
 ;
 
-SELECT *
+CREATE OR REPLACE VIEW v_purchasing_power_final as
+SELECT YEAR,
+		product_name,
+		round(sum(total_value::numeric)/avg_value::NUMERIC,2) AS purchasing_power
 FROM v_purchasing_power_bread_milk
+WHERE YEAR IN ('2006','2018')
+	AND product_name IN ('Mléko polotučné pasterované','Chléb konzumní kmínový')
+GROUP BY year, 
+		product_name,
+		avg_value
+;
+
+SELECT *
+FROM v_purchasing_power_final
+
+
+
 
 
