@@ -122,5 +122,38 @@ FROM v_purchasing_power_final
 
 
 
+-- Otázka 3: Která kategorie potravin zdražuje nejpomaleji (je u ní nejnižší percentuální meziroční nárůst)?
 
-
+WITH basic_table as
+(sELECT cpc.name AS product_name,
+		date_part('year',cp.date_from) AS year,
+		round(avg(cp.value::numeric),2) AS avg_value 
+FROM 
+ (SELECT category_code,
+ 		value,
+ 		date_from,
+ 		date_to
+	FROM czechia_price) cp
+LEFT JOIN 
+	(SELECT code,
+			name,
+			price_value,
+			price_unit
+	FROM czechia_price_category
+	) cpc
+ON cp.category_code = cpc.code
+WHERE name IS NOT NULL
+GROUP BY cpc.name,
+		date_part('year',cp.date_from)
+ORDER BY name, YEAR)
+SELECT product_name,
+		YEAR,
+		avg_value,
+		LAG (avg_value)OVER (PARTITION BY product_name ORDER BY YEAR) AS previous_avg_value,
+		round(((avg_value::numeric - LAG (avg_value)OVER (PARTITION BY product_name ORDER BY YEAR))/LAG (avg_value)OVER (PARTITION BY product_name ORDER BY YEAR))*100,2) AS percentage_increase
+FROM basic_table 
+GROUP BY product_name,
+		YEAR,
+		avg_value
+ORDER BY product_name, "year"
+;
