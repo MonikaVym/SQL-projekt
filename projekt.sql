@@ -1,6 +1,6 @@
 
 -- Otázka 1: Rostou v průběhu let mzdy ve všech odvětvích, nebo v některých klesají?
-
+CREATE OR REPLACE VIEW v_trend_of_wages as
 WITH total_wages AS (
     SELECT 
         branch.name AS branch_name,
@@ -35,22 +35,20 @@ FROM total_wages
 ORDER BY branch_name, payroll_year;
 
 /*
- * Mzdy v průběhu let klesaly ve všech odvětvích. category A-S
+ * Mzdy v průběhu let klesaly ve všech odvětvích. category A-S, nejvíce v letech 2013 a 2021
  */
 SELECT *
 FROM v_trend_of_wages v
 LEFT JOIN czechia_payroll_industry_branch cpib 
 	ON v.branch_name = cpib."name"
 WHERE v.trend_of_wages  = 'Decline'
-ORDER BY cpib.code
+ORDER BY v.payroll_year
 ;
 
-
-
---Otázka 2: Kolik je možné si koupit litrů mléka a kilogramů chleba za první a poslední srovnatelné období v dostupných datech cen a mezd?
+-- Otázka 2: Kolik je možné si koupit litrů mléka a kilogramů chleba za první a poslední srovnatelné období v dostupných datech cen a mezd?
 
 CREATE OR REPLACE VIEW v_price_bread_milk AS -- pouze ceny mléka a chleba, bez údajů mezd
-SELECT cpc.name AS product_name,
+SELECT  cpc.name AS product_name,
 		date_part('year',cp.date_from) AS date,
 		round(avg(cp.value::numeric),2) AS avg_value,
 		cpc.price_value,
@@ -73,22 +71,22 @@ WHERE lower(name) LIKE 'chléb%'
 	OR lower(name) LIKE 'mléko%'
 	AND name IS NOT NULL
 GROUP BY cpc.name,
-		date_part('year',cp.date_from),
-		cpc.price_value,
-		cpc.price_unit
+		 date_part('year',cp.date_from),
+		 cpc.price_value,
+		 cpc.price_unit
 ORDER BY name, date
 ;
 
 
 
 CREATE OR REPLACE VIEW v_purchasing_power_branches AS  -- kupní síla za dané odvětví (branch)
-SELECT wage.payroll_year AS year,
-	wage.branch_name,
-	wage.total_value,
-	wage.trend_of_wages,
-	price.product_name,
-	price.avg_value,
-	round(wage.total_value::numeric/price.avg_value::NUMERIC,2) AS purchasing_power
+SELECT  wage.payroll_year AS year,
+		wage.branch_name,
+		wage.total_value,
+		wage.trend_of_wages,
+		price.product_name,
+		price.avg_value,
+		round(wage.total_value::numeric/price.avg_value::NUMERIC,2) AS purchasing_power
 FROM
 	(SELECT branch_name,
 			payroll_year,
@@ -105,16 +103,16 @@ LEFT JOIN
  ON wage.payroll_year = price."date"
 ;
 
-CREATE OR REPLACE VIEW v_purchasing_power_final as
+CREATE OR REPLACE VIEW v_purchasing_power_final AS -- odpověď na otázku č. 2
 SELECT YEAR,
 		product_name,
 		round(sum(total_value::numeric)/avg_value::NUMERIC,2) AS purchasing_power
-FROM v_purchasing_power_bread_milk
+FROM v_purchasing_power_branches
 WHERE YEAR IN ('2006','2018')
 	AND product_name IN ('Mléko polotučné pasterované','Chléb konzumní kmínový')
 GROUP BY year, 
 		product_name,
-		avg_value
+		avg_value	
 ;
 
 SELECT *
@@ -122,10 +120,13 @@ FROM v_purchasing_power_final
 
 
 
+
+
+
 -- Otázka 3: Která kategorie potravin zdražuje nejpomaleji (je u ní nejnižší percentuální meziroční nárůst)?
 
 WITH basic_table as
-(sELECT cpc.name AS product_name,
+(SELECT cpc.name AS product_name,
 		date_part('year',cp.date_from) AS year,
 		round(avg(cp.value::numeric),2) AS avg_value 
 FROM 
@@ -155,5 +156,10 @@ FROM basic_table
 GROUP BY product_name,
 		YEAR,
 		avg_value
-ORDER BY product_name, "year"
+ORDER BY percentage_increase 
+LIMIT 1
 ;
+
+
+
+
