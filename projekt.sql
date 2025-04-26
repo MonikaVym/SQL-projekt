@@ -33,9 +33,14 @@ SELECT
     END AS Trend_of_wages
 FROM total_wages
 ORDER BY branch_name, payroll_year;
+;
+
+SELECT *
+FROM v_trend_of_wages
+;
 
 /*
- * Mzdy v průběhu let klesaly ve všech odvětvích. category A-S, nejvíce v letech 2013 a 2021
+ * Mzdy v průběhu let klesaly převážně v letech 2013 a 2021 a to ve všech odvětvích.
  */
 SELECT *
 FROM v_trend_of_wages v
@@ -77,6 +82,8 @@ GROUP BY cpc.name,
 ORDER BY name, date
 ;
 
+SELECT *
+FROM v_price_bread_milk
 
 
 CREATE OR REPLACE VIEW v_purchasing_power_branches AS  -- kupní síla za dané odvětví (branch)
@@ -118,8 +125,8 @@ GROUP BY year,
 SELECT *
 FROM v_purchasing_power_final
 
-
-
+SELECT *
+FROM v_purchasing_power_branches
 
 
 
@@ -159,6 +166,105 @@ GROUP BY product_name,
 ORDER BY percentage_increase 
 LIMIT 1
 ;
+
+
+-- Otázka 4: Existuje rok, ve kterém byl meziroční nárůst cen potravin výrazně vyšší než růst mezd (větší než 10 %)? 
+
+CREATE OR REPLACE VIEW v_value_of_products as
+WITH basic_table as
+(SELECT cpc.name AS product_name,
+		date_part('year',cp.date_from) AS year,
+		round(avg(cp.value::numeric),2) AS avg_value 
+FROM 
+ (SELECT category_code,
+ 		value,
+ 		date_from,
+ 		date_to
+	FROM czechia_price) cp
+LEFT JOIN 
+	(SELECT code,
+			name,
+			price_value,
+			price_unit
+	FROM czechia_price_category
+	) cpc
+ON cp.category_code = cpc.code
+WHERE name IS NOT NULL
+GROUP BY cpc.name,
+		date_part('year',cp.date_from)
+ORDER BY name, YEAR)
+SELECT product_name,
+		YEAR,
+		avg_value,
+		LAG (avg_value)OVER (PARTITION BY product_name ORDER BY YEAR) AS previous_avg_value,
+		round(((avg_value::numeric - LAG (avg_value)OVER (PARTITION BY product_name ORDER BY YEAR))/LAG (avg_value)OVER (PARTITION BY product_name ORDER BY YEAR))*100,2) AS percentage_increase
+FROM basic_table 
+GROUP BY product_name,
+		YEAR,
+		avg_value
+ORDER BY product_name, year
+;
+
+SELECT *
+FROM v_value_of_products
+;
+
+CREATE OR REPLACE VIEW v_percentage_increase_of_wages AS -- zvlášť VIEW s údaji o platech
+SELECT branch_name,
+		payroll_year,
+		total_value,
+		lag(total_value)OVER (PARTITION BY branch_name ORDER BY payroll_year) AS previous_total_value,
+		round(((total_value::numeric - lag(total_value)OVER (PARTITION BY branch_name ORDER BY payroll_year))/lag(total_value)OVER (PARTITION BY branch_name ORDER BY payroll_year)) * 100,2) AS percentage_increase_of_wages
+FROM v_trend_of_wages
+WHERE payroll_year >= 2006 AND payroll_year <=2018
+;
+
+SELECT *
+FROM v_percentage_increase_of_wages
+;
+
+CREATE OR REPLACE VIEW v_percentage_increase_of_wages_by_years as
+SELECT payroll_year,																-- průmerný meziroční nárůst mezd, seskupeno dle let
+	   round(avg(total_value),2) AS avg_total_value_of_wages,
+	   round(avg(previous_total_value),2) AS avg_prev_total_value_of_wages,
+	   round(avg(percentage_increase_of_wages),2) AS avg_percentage_increase_of_wages
+FROM v_percentage_increase_of_wages
+GROUP BY payroll_year
+;
+
+CREATE OR REPLACE VIEW v_percentage_increase_of_products_by_years as
+SELECT year,																		-- průměrný meziroční nárůst potravin, seskupeno dle let
+	   round(avg(avg_value),2) AS avg_total_value_of_products,
+	   round(avg(previous_avg_value),2) AS avg_prev_total_value_of_products,
+	   round(avg(percentage_increase),2) AS avg_percentage_increase_of_products
+FROM v_value_of_products
+GROUP BY year
+;
+
+SELECT *,																			-- odpověď na otázku, neexistuje rok, ve kterém byl meziroční nárůst cen potravin výrazně vyšší než růst mezd 
+	   products.avg_percentage_increase_of_products - wages.avg_percentage_increase_of_wages AS diff
+FROM v_percentage_increase_of_wages_by_years wages
+LEFT JOIN v_percentage_increase_of_products_by_years products
+ON wages.payroll_year = products.year
+
+
+/*
+ * Otázka 5: Má výška HDP vliv na změny ve mzdách a cenách potravin? Neboli, pokud HDP vzroste výrazněji v jednom roce, 
+ * projeví se to na cenách potravin či mzdách ve stejném nebo následujícím roce výraznějším růstem?
+ */
+
+SELECT country,
+		YEAR,
+		gdp,
+		lag(gdp)OVER (ORDER BY year) AS previous_gdp,
+		round((gdp::NUMERIC - lag(gdp)OVER (ORDER BY year))/lag(gdp)OVER (ORDER BY year)*100, 2) AS percentage_increase_of_gdp
+FROM economies e 
+WHERE country = 'Czech Republic'
+ AND gdp IS NOT NULL
+ AND YEAR >= 2006 AND year <=2018
+ORDER BY YEAR 
+
+
 
 
 
