@@ -1,4 +1,4 @@
-Projekt SQL - Dostupnost základních potravin široké veřejnosti v letech 2006 - 2018
+                        Projekt SQL - Dostupnost základních potravin široké veřejnosti v letech 2006 - 2018
 
 Cílem projektu je porovnat dostupnost základních potravin na základě průměrných příjmů v letech 2006 - 2018. Projekt obsahuje rozsáhlý datový podklad s informacemi o vývoji mezd v daných odvětvích a vývoj cen základních potravin. Primárním úkolem bylo sjednotit dostupná data dle let, zjistit průměr mezd, meziroční vývoj mezd i cen potravin a tato data mezi sebou porovnat.
 Projekt obsahuje tabulku t_monika_vymetalikova_project_SQL_primary_final.sql, která odpovídá na zadané výzkumné otázky a dodatečnou tabulku t_monika_vymetalikova_project_SQL_secondary_final.sql, kde jsou obsaženy informace o HDP, GINI koeficient a míra populace v dalších evropských státech.
